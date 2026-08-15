@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-latest
+          - system: aarch64-darwin
+            runner: macos-14
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@v16
+      - uses: DeterminateSystems/magic-nix-cache-action@v9
+      - name: Flake check
+        run: nix flake check --no-build
+      - name: Build opencodex
+        run: |
+          HASH="$(python3 -c 'import json; print(json.load(open("version.json"))["bunDepsHash"]["${{ matrix.system }}"])')"
+          if [[ -z "$HASH" || "$HASH" == "None" ]]; then
+            echo "No bunDeps hash for ${{ matrix.system }} yet; skipping build"
+            exit 0
+          fi
+          nix build .#packages.${{ matrix.system }}.opencodex --print-out-paths

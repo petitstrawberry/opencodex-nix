@@ -1,0 +1,99 @@
+name: update
+
+on:
+  schedule:
+    # 21:17 UTC daily = 06:17 JST
+    - cron: "17 21 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: DeterminateSystems/nix-installer-action@v16
+      - uses: DeterminateSystems/magic-nix-cache-action@v9
+      - name: Update version and x86_64-linux hashes
+        run: ./scripts/update.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Commit and push
+        id: commit
+        run: |
+          if git diff --quiet -- version.json bun.lock.normalized; then
+            echo "No changes"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add version.json bun.lock.normalized
+          VERSION="$(python3 -c 'import json; print(json.load(open("version.json"))["version"])')"
+          git commit -m "chore: refresh opencodex ${VERSION} build metadata"
+          git push origin HEAD:bot/opencodex-update --force
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+  darwin:
+    needs: linux
+    if: needs.linux.outputs.changed == 'true'
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bot/opencodex-update
+      - uses: DeterminateSystems/nix-installer-action@v16
+      - uses: DeterminateSystems/magic-nix-cache-action@v9
+      - name: Compute aarch64-darwin bunDeps hash
+        run: ./scripts/update-darwin.sh
+      - name: Commit and push
+        run: |
+          if git diff --quiet -- version.json; then
+            echo "No darwin hash change"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add version.json
+          VERSION="$(python3 -c 'import json; print(json.load(open("version.json"))["version"])')"
+          git commit -m "chore: add aarch64-darwin bunDeps hash for opencodex ${VERSION}"
+          git push origin HEAD:bot/opencodex-update
+
+  pr:
+    needs: darwin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create or update pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch origin main bot/opencodex-update
+          OLD_VERSION="$(git show origin/main:version.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
+          NEW_VERSION="$(git show origin/bot/opencodex-update:version.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
+          if [[ "$OLD_VERSION" != "$NEW_VERSION" ]]; then
+            TITLE="chore: bump opencodex to ${NEW_VERSION}"
+          else
+            TITLE="chore: refresh opencodex build metadata (${NEW_VERSION})"
+          fi
+          BODY="Automated update of the pinned opencodex version/hashes by the daily update workflow.
+
+- Version: ${NEW_VERSION}
+- src hash and x86_64-linux / aarch64-darwin bunDeps hashes refreshed as needed
+- normalized bun.lock regenerated on version bumps
+
+CI (ci.yml) verifies the build on both platforms. Merge to publish."
+          if gh pr view bot/opencodex-update --json number >/dev/null 2>&1; then
+            echo "PR already exists; leaving as is"
+          else
+            gh pr create --base main --head bot/opencodex-update --title "$TITLE" --body "$BODY"
+          fi

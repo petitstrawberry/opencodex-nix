@@ -1,0 +1,8 @@
+{
+  "version": "2.19.0",
+  "srcHash": "sha256-J/EiLD0UVTMLdG4nLt3SacHBA6jOpbMi0UBlWeVQZ/c=",
+  "bunDepsHash": {
+    "aarch64-darwin": null,
+    "x86_64-linux": null
+  }
+}
