@@ -66,7 +66,15 @@ with open("version.json", "w") as f:
 PY
 
   OUT="$(nix build .#packages.x86_64-linux.opencodex --no-link 2>&1 || true)"
-  GOT="$(printf '%s\n' "$OUT" | sed -n 's/.*got: *\(sha256-[A-Za-z0-9+/=]\{10,\}\).*/\1/p' | tail -1)"
+  GOT="$(printf '%s\n' "$OUT" | "$PY" -c '
+import re, sys
+ansi = re.compile(r"\x1b\[[0-9;]*m")
+for line in sys.stdin:
+    line = ansi.sub("", line).replace("\r", "")
+    m = re.search(r"got:\s+(sha256-[A-Za-z0-9+/=]+)", line)
+    if m:
+        print(m.group(1))
+' | tail -1)"
   if [[ -z "$GOT" ]]; then
     echo "could not obtain x86_64-linux bunDeps hash; build output:" >&2
     printf '%s\n' "$OUT" >&2
