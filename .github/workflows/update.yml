@@ -19,6 +19,8 @@ jobs:
         with:
           ref: main
       - uses: DeterminateSystems/nix-installer-action@v16
+        with:
+          extra-conf: sandbox = false
       - uses: DeterminateSystems/magic-nix-cache-action@v9
       - name: Update version and x86_64-linux hashes
         run: ./scripts/update.sh
@@ -49,6 +51,8 @@ jobs:
         with:
           ref: bot/opencodex-update
       - uses: DeterminateSystems/nix-installer-action@v16
+        with:
+          extra-conf: sandbox = false
       - uses: DeterminateSystems/magic-nix-cache-action@v9
       - name: Compute aarch64-darwin bunDeps hash
         run: ./scripts/update-darwin.sh

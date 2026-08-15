@@ -96,14 +96,15 @@ PY
   '';
 in
 {
-  opencodex = prev.stdenv.mkDerivation {
-    inherit pname version src;
+  opencodex =
+    (prev.stdenv.mkDerivation {
+      inherit pname version src;
 
-    nativeBuildInputs = [ bun prev.python3 prev.makeWrapper ];
-    buildInputs = [ prev.nodejs ];
+      nativeBuildInputs = [ bun prev.python3 prev.makeWrapper ];
+      buildInputs = [ prev.nodejs ];
 
-    patchPhase = ''
-      ${prev.python3}/bin/python3 - <<'PY'
+      patchPhase = ''
+        ${prev.python3}/bin/python3 - <<'PY'
 import json
 p = "package.json"
 d = json.load(open(p))
@@ -111,38 +112,39 @@ d["dependencies"].pop("bun", None)
 d["trustedDependencies"] = [t for t in d.get("trustedDependencies", []) if t != "bun"]
 json.dump(d, open(p, "w"), indent=2, ensure_ascii=False)
 PY
-      cp -a ${bunDeps}/root ./node_modules
-      cp -a ${bunDeps}/gui ./gui/node_modules
-      chmod -R u+w node_modules gui/node_modules
-    '';
+        cp -a ${bunDeps}/root ./node_modules
+        cp -a ${bunDeps}/gui ./gui/node_modules
+        chmod -R u+w node_modules gui/node_modules
+      '';
 
-    buildPhase = ''
-      runHook preBuild
-      ( cd gui && bun run build )
-      runHook postBuild
-    '';
+      buildPhase = ''
+        runHook preBuild
+        ( cd gui && bun run build )
+        runHook postBuild
+      '';
 
-    installPhase = ''
-      runHook preInstall
-      mkdir -p $out/lib/opencodex $out/lib/opencodex/gui $out/bin
-      cp -a bin src package.json $out/lib/opencodex/
-      mkdir -p $out/lib/opencodex/gui
-      cp -a gui/dist $out/lib/opencodex/gui/dist
-      cp -a node_modules $out/lib/opencodex/node_modules
-      makeWrapper ${prev.nodejs}/bin/node $out/bin/ocx \
-        --add-flags "$out/lib/opencodex/bin/ocx.mjs" \
-        --set OPENCODEX_BUN_PATH ${bun}/bin/bun \
-        --prefix PATH : ${makeBinPath [ prev.nodejs bun ]}
-      ln -s ocx $out/bin/opencodex
-      runHook postInstall
-    '';
+      installPhase = ''
+        runHook preInstall
+        mkdir -p $out/lib/opencodex $out/lib/opencodex/gui $out/bin
+        cp -a bin src package.json $out/lib/opencodex/
+        mkdir -p $out/lib/opencodex/gui
+        cp -a gui/dist $out/lib/opencodex/gui/dist
+        cp -a node_modules $out/lib/opencodex/node_modules
+        makeWrapper ${prev.nodejs}/bin/node $out/bin/ocx \
+          --add-flags "$out/lib/opencodex/bin/ocx.mjs" \
+          --set OPENCODEX_BUN_PATH ${bun}/bin/bun \
+          --prefix PATH : ${makeBinPath [ prev.nodejs bun ]}
+        ln -s ocx $out/bin/opencodex
+        runHook postInstall
+      '';
 
-    meta = {
-      description = "Universal provider proxy for OpenAI Codex, Claude Code, Claude Desktop & Grok Build";
-      homepage = "https://opencodex.me/";
-      license = prev.lib.licenses.mit;
-      mainProgram = "ocx";
-      platforms = [ "aarch64-darwin" "x86_64-darwin" "x86_64-linux" "aarch64-linux" ];
-    };
-  };
+      meta = {
+        description = "Universal provider proxy for OpenAI Codex, Claude Code, Claude Desktop & Grok Build";
+        homepage = "https://opencodex.me/";
+        license = prev.lib.licenses.mit;
+        mainProgram = "ocx";
+        platforms = [ "aarch64-darwin" "x86_64-darwin" "x86_64-linux" "aarch64-linux" ];
+      };
+    })
+    // { inherit bunDeps; };
 }

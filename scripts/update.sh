@@ -4,7 +4,8 @@
 # - If a new upstream release exists: bump version, refresh the src hash and
 #   regenerate the normalized bun.lock.
 # - Always ensure the x86_64-linux bunDeps hash is present, computing it by
-#   building the fixed-output dependency snapshot on this runner.
+#   building the dependency snapshot as a plain (non-fixed-output) derivation
+#   and reading the NAR hash of its output — no error-text parsing.
 # - Finally verify the full package builds.
 #
 # Intended to run on an x86_64-linux GitHub Actions runner (ubuntu-latest).
@@ -53,43 +54,37 @@ PY
 fi
 
 # --- ensure x86_64-linux bunDeps hash ---------------------------------------
-LINUX_HASH="$("$PY" -c 'import json; print(json.load(open("version.json"))["bunDepsHash"]["x86_64-linux"])')"
-if [[ -z "$LINUX_HASH" || "$LINUX_HASH" == "None" ]]; then
-  echo "Computing x86_64-linux bunDeps hash..."
-  "$PY" - <<'PY'
-import json
-d = json.load(open("version.json"))
-d["bunDepsHash"]["x86_64-linux"] = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-with open("version.json", "w") as f:
-    json.dump(d, f, indent=2)
-    f.write("\n")
-PY
-
-  OUT="$(nix build .#packages.x86_64-linux.opencodex --no-link 2>&1 || true)"
-  GOT="$(printf '%s\n' "$OUT" | "$PY" -c '
-import re, sys
-ansi = re.compile(r"\x1b\[[0-9;]*m")
-for line in sys.stdin:
-    line = ansi.sub("", line).replace("\r", "")
-    m = re.search(r"got:\s+(sha256-[A-Za-z0-9+/=]+)", line)
-    if m:
-        print(m.group(1))
-' | tail -1)"
-  if [[ -z "$GOT" ]]; then
-    echo "could not obtain x86_64-linux bunDeps hash; build output:" >&2
-    printf '%s\n' "$OUT" >&2
-    exit 1
+ensure_hash() {
+  local platform="$1"
+  local current
+  current="$("$PY" -c "import json; print(json.load(open('version.json'))['bunDepsHash']['$platform'])" )"
+  if [[ -n "$current" && "$current" != "None" ]]; then
+    echo "$platform bunDeps hash already present: $current"
+    return 0
   fi
-  "$PY" - "$GOT" <<'PY'
+
+  echo "Computing $platform bunDeps hash..."
+  # Build the dependency snapshot as a plain (non-fixed-output) derivation so
+  # we can read the NAR hash of its output directly. The sandbox must be off
+  # for that build (network access for `bun install`).
+  local path
+  path="$(nix build ".#packages.${platform}.opencodex.bunDeps" --no-link --print-out-paths --option sandbox false)"
+  local hash
+  hash="$(nix path-info --json --json-format 1 "$path" | "$PY" -c 'import json,sys; d=json.load(sys.stdin); print(d[list(d)[0]]["narHash"])')"
+
+  "$PY" - "$platform" "$hash" <<'PY'
 import json, sys
+platform, hash_ = sys.argv[1], sys.argv[2]
 d = json.load(open("version.json"))
-d["bunDepsHash"]["x86_64-linux"] = sys.argv[1]
+d["bunDepsHash"][platform] = hash_
 with open("version.json", "w") as f:
     json.dump(d, f, indent=2)
     f.write("\n")
 PY
-  echo "x86_64-linux bunDeps hash: $GOT"
-fi
+  echo "$platform bunDeps hash: $hash"
+}
+
+ensure_hash "x86_64-linux"
 
 # --- final verification build ------------------------------------------------
 nix build .#packages.x86_64-linux.opencodex --no-link
