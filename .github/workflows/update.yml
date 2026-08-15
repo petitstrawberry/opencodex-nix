@@ -86,11 +86,11 @@ jobs:
           fi
           BODY="Automated update of the pinned opencodex version/hashes by the daily update workflow.
 
-- Version: ${NEW_VERSION}
-- src hash and x86_64-linux / aarch64-darwin bunDeps hashes refreshed as needed
-- normalized bun.lock regenerated on version bumps
+          - Version: ${NEW_VERSION}
+          - src hash and x86_64-linux / aarch64-darwin bunDeps hashes refreshed as needed
+          - normalized bun.lock regenerated on version bumps
 
-CI (ci.yml) verifies the build on both platforms. Merge to publish."
+          CI (ci.yml) verifies the build on both platforms. Merge to publish."
           if gh pr view bot/opencodex-update --json number >/dev/null 2>&1; then
             echo "PR already exists; leaving as is"
           else
