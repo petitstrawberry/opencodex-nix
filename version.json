@@ -2,7 +2,7 @@
   "version": "2.19.0",
   "srcHash": "sha256-J/EiLD0UVTMLdG4nLt3SacHBA6jOpbMi0UBlWeVQZ/c=",
   "bunDepsHash": {
-    "aarch64-darwin": "sha256-F6vZ1j+7HoHtErpGzFjXfn1hEL+np3oLBlslEzHmJKY=",
-    "x86_64-linux": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    "aarch64-darwin": null,
+    "x86_64-linux": null
   }
 }
