@@ -2,7 +2,6 @@ name: update
 
 on:
   schedule:
-    # 21:17 UTC daily = 06:17 JST
     - cron: "17 21 * * *"
   workflow_dispatch:
 
