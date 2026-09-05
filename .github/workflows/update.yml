@@ -4,33 +4,139 @@ on:
   schedule:
     - cron: "17 21 * * *"
   workflow_dispatch:
+    inputs:
+      force:
+        description: Recompute both platform hashes even when already current
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: opencodex-update
+  cancel-in-progress: true
+
 jobs:
-  linux:
+  prepare:
     runs-on: ubuntu-latest
     outputs:
-      changed: ${{ steps.commit.outputs.changed }}
+      changed: ${{ steps.prepare.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.sha }}
+      - uses: DeterminateSystems/nix-installer-action@v16
+      - name: Prepare source update
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE_UPDATE: ${{ inputs.force }}
+        run: |
+          ./scripts/prepare-update.sh
+          if [[ "$FORCE_UPDATE" == "true" ]]; then
+            echo "Forcing platform hash recomputation"
+            python3 - <<'PY'
+          import json
+          p = "version.json"
+          d = json.load(open(p))
+          d["bunDepsHash"]["x86_64-linux"] = None
+          d["bunDepsHash"]["aarch64-darwin"] = None
+          with open(p, "w") as f:
+              json.dump(d, f, indent=2)
+              f.write("\n")
+          PY
+          fi
+          MISSING_HASH="$(python3 -c '
+          import json
+          d = json.load(open("version.json"))
+          platforms = ("x86_64-linux", "aarch64-darwin")
+          print(str(any(d["bunDepsHash"].get(p) is None for p in platforms)).lower())
+          ')"
+          if git diff --quiet -- version.json bun.lock.normalized \
+            && [[ "$MISSING_HASH" == "false" ]]; then
+            echo "Already current; no update required"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Update prepared"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: steps.prepare.outputs.changed == 'true'
+        with:
+          name: prepared-update
+          path: |
+            version.json
+            bun.lock.normalized
+          if-no-files-found: error
+          retention-days: 1
+
+  hashes:
+    needs: prepare
+    if: needs.prepare.outputs.changed == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-latest
+          - system: aarch64-darwin
+            runner: macos-14
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: prepared-update
+          path: .
       - uses: DeterminateSystems/nix-installer-action@v16
         with:
           extra-conf: sandbox = false
-      - uses: DeterminateSystems/magic-nix-cache-action@v9
-      - name: Update version and x86_64-linux hashes
-        run: ./scripts/update.sh
-        env:
-          GH_TOKEN: ${{ github.token }}
-      - name: Commit and push
+      - name: Compute and verify ${{ matrix.system }} hash
+        run: ./scripts/update-platform.sh "${{ matrix.system }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: metadata-${{ matrix.system }}
+          path: version.json
+          if-no-files-found: error
+          retention-days: 1
+
+  finalize:
+    needs: [prepare, hashes]
+    if: needs.prepare.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: prepared-update
+          path: .
+      - uses: actions/download-artifact@v4
+        with:
+          name: metadata-x86_64-linux
+          path: ${{ runner.temp }}/metadata-linux
+      - uses: actions/download-artifact@v4
+        with:
+          name: metadata-aarch64-darwin
+          path: ${{ runner.temp }}/metadata-darwin
+      - name: Merge platform hashes
+        run: |
+          ./scripts/merge-platform-hashes.py \
+            version.json \
+            "$RUNNER_TEMP/metadata-linux/version.json" \
+            "$RUNNER_TEMP/metadata-darwin/version.json"
+      - name: Commit update
         id: commit
         run: |
           if git diff --quiet -- version.json bun.lock.normalized; then
-            echo "No changes"
+            echo "Finalized metadata already matches the source revision"
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -41,42 +147,8 @@ jobs:
           git commit -m "chore: refresh opencodex ${VERSION} build metadata"
           git push origin HEAD:bot/opencodex-update --force
           echo "changed=true" >> "$GITHUB_OUTPUT"
-
-  darwin:
-    needs: linux
-    if: needs.linux.outputs.changed == 'true'
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: bot/opencodex-update
-      - uses: DeterminateSystems/nix-installer-action@v16
-        with:
-          extra-conf: sandbox = false
-      - uses: DeterminateSystems/magic-nix-cache-action@v9
-      - name: Compute aarch64-darwin bunDeps hash
-        run: ./scripts/update-darwin.sh
-      - name: Commit and push
-        run: |
-          if git diff --quiet -- version.json; then
-            echo "No darwin hash change"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add version.json
-          VERSION="$(python3 -c 'import json; print(json.load(open("version.json"))["version"])')"
-          git commit -m "chore: add aarch64-darwin bunDeps hash for opencodex ${VERSION}"
-          git push origin HEAD:bot/opencodex-update
-
-  pr:
-    needs: darwin
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - name: Create or update pull request
+        if: steps.commit.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

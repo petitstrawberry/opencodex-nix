@@ -33,8 +33,8 @@
 # daily and opens a PR. To bump manually:
 #   1. edit version.json (version + srcHash; null out bunDepsHash)
 #   2. regenerate bun.lock.normalized: scripts/normalize-lock.py <upstream bun.lock>
-#   3. build once per platform and copy the "got: sha256-..." hash into
-#      version.json (or run scripts/update.sh on the platform)
+#   3. run scripts/update-platform.sh <system> once per platform to compute
+#      and verify the bunDeps hash
 
 final: prev:
 let

@@ -59,12 +59,13 @@ nix run .#packages.aarch64-darwin.opencodex
 1. 最新リリース (`lidge-jun/opencodex`) を確認
 2. 新バージョンがあれば src hash を再計算し、`bun.lock.normalized` を再生成
 3. x86_64-linux (ubuntu runner) と aarch64-darwin (macos runner) の
-   bunDeps hash を実ビルドで算出
-4. `bot/opencodex-update` ブランチに push して PR を開く
+   bunDeps hash を並列の実ビルドで算出
+4. 両方の結果をマージし、`bot/opencodex-update` ブランチに1回だけ push
+5. open 中の更新 PR があれば更新し、なければ新しい PR を開く
 
-手動実行: `gh workflow run update`。手動バンプは `version.json` を書き換えて
-各プラットフォームで `scripts/update.sh` (linux) / `scripts/update-darwin.sh`
-(macos) を実行してください。
+手動実行: `gh workflow run update`。手動バンプは
+`scripts/prepare-update.sh` を実行後、各プラットフォームで
+`scripts/update-platform.sh <system>` を実行してください。
 
 ## Supported platforms
 
