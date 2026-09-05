@@ -2,7 +2,7 @@
   "version": "2.42.0",
   "srcHash": "sha256-SEpVYqfdCR89Nle96wbJpqxJhjvuQpKDCjWVx31yaRY=",
   "bunDepsHash": {
-    "aarch64-darwin": null,
+    "aarch64-darwin": "sha256-1EWCRbvOGQHeSwMs/PFmR/RiahglTNlxzQhXxVtpBtA=",
     "x86_64-linux": "sha256-vOfsO674QX6zZqHGeuw1ySWk//Mr2UccR38Ye0B72ec="
   }
 }
