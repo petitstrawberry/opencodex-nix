@@ -96,7 +96,6 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@v16
         with:
           extra-conf: sandbox = false
-      - uses: DeterminateSystems/magic-nix-cache-action@v9
       - name: Compute and verify ${{ matrix.system }} hash
         run: ./scripts/update-platform.sh "${{ matrix.system }}"
       - uses: actions/upload-artifact@v4
