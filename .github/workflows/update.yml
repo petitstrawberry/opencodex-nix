@@ -95,8 +95,28 @@ jobs:
           - normalized bun.lock regenerated on version bumps
 
           CI (ci.yml) verifies the build on both platforms. Merge to publish."
-          if gh pr view bot/opencodex-update --json number >/dev/null 2>&1; then
-            echo "PR already exists; leaving as is"
+          OPEN_PR_NUMBER="$(gh pr list \
+            --base main \
+            --head bot/opencodex-update \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+          if [[ -n "$OPEN_PR_NUMBER" ]]; then
+            echo "Updating open PR #${OPEN_PR_NUMBER}"
+            gh api \
+              --method PATCH \
+              "repos/${GITHUB_REPOSITORY}/pulls/${OPEN_PR_NUMBER}" \
+              -f title="$TITLE" \
+              -f body="$BODY" \
+              >/dev/null
           else
-            gh pr create --base main --head bot/opencodex-update --title "$TITLE" --body "$BODY"
+            echo "Creating PR from bot/opencodex-update"
+            gh api \
+              --method POST \
+              "repos/${GITHUB_REPOSITORY}/pulls" \
+              -f title="$TITLE" \
+              -f head="bot/opencodex-update" \
+              -f base="main" \
+              -f body="$BODY" \
+              --jq .html_url
           fi

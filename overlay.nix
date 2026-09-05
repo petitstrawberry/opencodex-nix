@@ -115,6 +115,7 @@ PY
         cp -a ${bunDeps}/root ./node_modules
         cp -a ${bunDeps}/gui ./gui/node_modules
         chmod -R u+w node_modules gui/node_modules
+        patchShebangs node_modules gui/node_modules
       '';
 
       buildPhase = ''
