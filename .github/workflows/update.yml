@@ -145,14 +145,14 @@ jobs:
           git add version.json bun.lock.normalized
           VERSION="$(python3 -c 'import json; print(json.load(open("version.json"))["version"])')"
           git commit -m "chore: refresh opencodex ${VERSION} build metadata"
-          git push origin HEAD:bot/opencodex-update --force
+          git push origin "HEAD:refs/heads/bot/opencodex-update" --force
           echo "changed=true" >> "$GITHUB_OUTPUT"
       - name: Create or update pull request
         if: steps.commit.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          git fetch origin main bot/opencodex-update
+          git fetch origin main "+refs/heads/bot/opencodex-update:refs/remotes/origin/bot/opencodex-update"
           OLD_VERSION="$(git show origin/main:version.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
           NEW_VERSION="$(git show origin/bot/opencodex-update:version.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
           if [[ "$OLD_VERSION" != "$NEW_VERSION" ]]; then
