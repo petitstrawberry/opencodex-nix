@@ -63,10 +63,12 @@ nix run .#packages.aarch64-darwin.opencodex
 4. 両方の結果をマージし、検証済みの状態で `main` に push
    (main が進んでいた場合は rebase して再試行)
 
-更新内容を PR でレビューしたい場合は `gh workflow run update -f mode=pr`。
+更新内容を PR として残したい場合は `gh workflow run update -f mode=pr`。
 その場合は `bot/opencodex-update` ブランチに push し、open 中の更新 PR を
-更新 (なければ作成) します。`-f force=true` を付けるとバージョンが最新でも
-両プラットフォームの hash を計算し直します。
+更新 (なければ作成) したうえで auto-merge を有効化するため、こちらも人手は
+不要です。main に必須チェックを設定していないので auto-merge は即座に
+マージされます。`-f force=true` を付けるとバージョンが最新でも両プラット
+フォームの hash を計算し直します。
 
 検証は 3 の実ビルド (= ci.yml と同じビルド) で完了しているため、push 前に
 別途 CI を待つ必要はありません。なお GitHub の仕様で `GITHUB_TOKEN` による

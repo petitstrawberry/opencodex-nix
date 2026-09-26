@@ -181,6 +181,7 @@ jobs:
         run: |
           git push origin "HEAD:refs/heads/bot/opencodex-update" --force
       - name: Create or update pull request
+        id: pr
         if: steps.commit.outputs.changed == 'true' && inputs.mode == 'pr'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -199,7 +200,7 @@ jobs:
           - src hash and x86_64-linux / aarch64-darwin bunDeps hashes refreshed as needed
           - normalized bun.lock regenerated on version bumps
 
-          CI (ci.yml) verifies the build on both platforms. Merge to publish."
+          Both platforms were built and verified in the update workflow before this PR was opened. Auto-merge is enabled, so no review is required to publish."
           OPEN_PR_NUMBER="$(gh pr list \
             --base main \
             --head bot/opencodex-update \
@@ -216,12 +217,29 @@ jobs:
               >/dev/null
           else
             echo "Creating PR from bot/opencodex-update"
-            gh api \
+            OPEN_PR_NUMBER="$(gh api \
               --method POST \
               "repos/${GITHUB_REPOSITORY}/pulls" \
               -f title="$TITLE" \
               -f head="bot/opencodex-update" \
               -f base="main" \
               -f body="$BODY" \
-              --jq .html_url
+              --jq .number)"
           fi
+          echo "number=${OPEN_PR_NUMBER}" >> "$GITHUB_OUTPUT"
+      - name: Enable auto-merge
+        if: steps.commit.outputs.changed == 'true' && inputs.mode == 'pr'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ steps.pr.outputs.number }}"
+          for attempt in 1 2 3; do
+            if gh pr merge "$PR_NUMBER" --squash --auto; then
+              echo "Auto-merge enabled on PR #${PR_NUMBER}"
+              exit 0
+            fi
+            echo "auto-merge attempt ${attempt} failed; retrying"
+            sleep 15
+          done
+          echo "could not enable auto-merge on PR #${PR_NUMBER}" >&2
+          exit 1
