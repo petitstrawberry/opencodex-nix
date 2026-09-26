@@ -7,7 +7,7 @@ nixpkgs に opencodex パッケージはなく、プロジェクトも npm の
 package-lock ではなく `bun.lock` しか配布していないため、このリポジトリで
 hermetic なビルドを提供しています。バージョンとハッシュは
 [version.json](./version.json) が唯一の情報源で、GitHub Actions が毎日
-最新リリースを確認して自動更新の PR を開きます。
+最新リリースを確認して `main` を自動更新します。
 
 ## Usage
 
@@ -59,12 +59,21 @@ nix run .#packages.aarch64-darwin.opencodex
 1. 最新リリース (`lidge-jun/opencodex`) を確認
 2. 新バージョンがあれば src hash を再計算し、`bun.lock.normalized` を再生成
 3. x86_64-linux (ubuntu runner) と aarch64-darwin (macos runner) の
-   bunDeps hash を並列の実ビルドで算出
-4. 両方の結果をマージし、`bot/opencodex-update` ブランチに1回だけ push
-5. open 中の更新 PR があれば更新し、なければ新しい PR を開く
+   bunDeps hash を並列の実ビルドで算出し、そのまま `nix build` で検証
+4. 両方の結果をマージし、検証済みの状態で `main` に push
+   (main が進んでいた場合は rebase して再試行)
 
-手動実行: `gh workflow run update`。手動バンプは
-`scripts/prepare-update.sh` を実行後、各プラットフォームで
+更新内容を PR でレビューしたい場合は `gh workflow run update -f mode=pr`。
+その場合は `bot/opencodex-update` ブランチに push し、open 中の更新 PR を
+更新 (なければ作成) します。`-f force=true` を付けるとバージョンが最新でも
+両プラットフォームの hash を計算し直します。
+
+検証は 3 の実ビルド (= ci.yml と同じビルド) で完了しているため、push 前に
+別途 CI を待つ必要はありません。なお GitHub の仕様で `GITHUB_TOKEN` による
+push は他ワークフローを起動しないため、自動更新後の main では ci.yml は
+走りません。
+
+手動バンプは `scripts/prepare-update.sh` を実行後、各プラットフォームで
 `scripts/update-platform.sh <system>` を実行してください。
 
 ## Supported platforms

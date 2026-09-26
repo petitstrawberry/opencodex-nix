@@ -10,6 +10,14 @@ on:
         required: false
         type: boolean
         default: false
+      mode:
+        description: push publishes to main directly; pr opens a reviewable pull request
+        required: false
+        type: choice
+        options:
+          - push
+          - pr
+        default: push
 
 permissions:
   contents: write
@@ -142,17 +150,42 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
+          OLD_VERSION="$(git show origin/main:version.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
+          NEW_VERSION="$(python3 -c 'import json; print(json.load(open("version.json"))["version"])')"
+          if [[ "$OLD_VERSION" != "$NEW_VERSION" ]]; then
+            MESSAGE="chore: bump opencodex to ${NEW_VERSION}"
+          else
+            MESSAGE="chore: refresh opencodex ${NEW_VERSION} build metadata"
+          fi
           git add version.json bun.lock.normalized
-          VERSION="$(python3 -c 'import json; print(json.load(open("version.json"))["version"])')"
-          git commit -m "chore: refresh opencodex ${VERSION} build metadata"
-          git push origin "HEAD:refs/heads/bot/opencodex-update" --force
+          git commit -m "$MESSAGE"
+          echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
           echo "changed=true" >> "$GITHUB_OUTPUT"
+      - name: Publish to main
+        if: steps.commit.outputs.changed == 'true' && (inputs.mode || 'push') == 'push'
+        run: |
+          for attempt in 1 2 3; do
+            git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
+            if git rebase origin/main && git push origin "HEAD:refs/heads/main"; then
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            echo "push attempt ${attempt} failed; retrying"
+            sleep 15
+          done
+          echo "could not publish the update to main" >&2
+          exit 1
+      - name: Push update branch
+        if: steps.commit.outputs.changed == 'true' && inputs.mode == 'pr'
+        run: |
+          git push origin "HEAD:refs/heads/bot/opencodex-update" --force
       - name: Create or update pull request
-        if: steps.commit.outputs.changed == 'true'
+        if: steps.commit.outputs.changed == 'true' && inputs.mode == 'pr'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          git fetch origin main "+refs/heads/bot/opencodex-update:refs/remotes/origin/bot/opencodex-update"
+          git fetch --no-tags origin "+refs/heads/bot/opencodex-update:refs/remotes/origin/bot/opencodex-update"
           OLD_VERSION="$(git show origin/main:version.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
           NEW_VERSION="$(git show origin/bot/opencodex-update:version.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
           if [[ "$OLD_VERSION" != "$NEW_VERSION" ]]; then
