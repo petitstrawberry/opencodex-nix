@@ -1,6 +1,6 @@
 {
-  "version": "2.70.0",
-  "srcHash": "sha256-CaVLJNhw03esArilmEK+pc3ZscYVHcrcHwObFefUXg4=",
+  "version": "2.72.0",
+  "srcHash": "sha256-OPQpLhwUK0IE3i3/1yzh/D44ADaX2uPqCOdUiUhsg5w=",
   "bunDepsHash": {
     "aarch64-darwin": "sha256-X+TwGlsiqQ9uJ5Nbbtqm3oT29kcBxdBdZFvEUmuYbWA=",
     "x86_64-linux": "sha256-n3nDey0eA+Ul/u05mtJOJs2Pg3gNJSbcpwdPhsIXyE0="
