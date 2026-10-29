@@ -1,8 +1,8 @@
 {
-  "version": "2.93.0",
-  "srcHash": "sha256-nzzDYVgUdw00AeR6BkMgG3oTPPjGlEmFcKmfgysan3U=",
+  "version": "2.94.0",
+  "srcHash": "sha256-FlWyANRYKEabmif7Z71ATk0b2O6205jy3FzncS6jge8=",
   "bunDepsHash": {
-    "aarch64-darwin": "sha256-s2ob+NYcs631KBZAcBo2Lf41OWNFuP4b4ZE0b1gtS6I=",
-    "x86_64-linux": "sha256-hdTlv2VtiZLPcsVMMg/FBgh9Wf2qS9oNjRFMR8ryNV8="
+    "aarch64-darwin": "sha256-JNmMtu8+BRLGD4GG939lcP3LRVDfdmPF23uQYnzPs3A=",
+    "x86_64-linux": "sha256-PFhfEGoQfftOx90nNebiF7P/hnnBMY0LtrCDMaT3Rqw="
   }
 }
